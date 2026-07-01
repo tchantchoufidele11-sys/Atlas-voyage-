@@ -1042,7 +1042,10 @@ function buildTripContext(){
   return ctx;
 }
 const DEFAULT_S={ version:"0.2.0", settings:{ lang:"fr", theme:"system", units:"metric", autoTranslate:true, gkey:"", mapKey:"", agentName:"", mbSync:false, mbLink:"" }, trips:[] };
-const BUILD="0.3.0 · build 130";
+/* Clé Maps JS partagée (restreinte au domaine GitHub Pages). Repli : clé perso de l'utilisateur si fournie. */
+const SHARED_MAP_KEY="AIzaSyCVuaQyq8Fg-_qPVtmtVU__KMrAjDbrRkI";
+function mapKey(){ return (S.settings.mapKey||"").trim() || SHARED_MAP_KEY; }
+const BUILD="0.3.0 · build 131";
 let S=loadState();
 function normalizeTrip(tr){ if(!tr||typeof tr!=="object") return tr;
   tr.id=tr.id||("t"+Date.now()+Math.random().toString(36).slice(2,7));
@@ -3008,7 +3011,7 @@ async function loadWeather(tr,date){ if(!(tr.dest&&tr.dest.lat!=null)) return; c
 
 /* ----- Carte Google ----- */
 let _mapsP=null;
-function loadMaps(){ if(window.google&&window.google.maps) return Promise.resolve(); if(_mapsP) return _mapsP; const key=S.settings.mapKey; if(!key) return Promise.reject("nokey");
+function loadMaps(){ if(window.google&&window.google.maps) return Promise.resolve(); if(_mapsP) return _mapsP; const key=mapKey(); if(!key) return Promise.reject("nokey");
   _mapsP=new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(key)+"&libraries=geometry&language="+lang(); s.async=true; s.defer=true; s.onload=()=>res(); s.onerror=()=>{ _mapsP=null; rej("load"); }; document.head.appendChild(s); }); return _mapsP; }
 function dayStart(tr){ if(tr.lodging&&tr.lodging.lat!=null) return {lat:tr.lodging.lat,lng:tr.lodging.lng,name:tr.lodging.name||t("create.lodging")};
   if(tr.dest&&tr.dest.lat!=null) return {lat:tr.dest.lat,lng:tr.dest.lng,name:tr.dest.name||"—"}; return null; }
@@ -3028,7 +3031,7 @@ function mapMarker(map,info,pos,title,mode,o){ o=o||{}; const conf={position:pos
     google.maps.event.addListenerOnce(info,"domready",()=>{ const b=document.getElementById("svBtn"); if(b) b.onclick=e=>{ e.preventDefault(); openStreetView(pos.lat,pos.lng,title); }; });
   });
   return m; }
-function renderDayMap(stops,tr,day){ const el=document.getElementById("planMap"); if(!el) return; if(!S.settings.mapKey){ el.style.display="none"; return; }
+function renderDayMap(stops,tr,day){ const el=document.getElementById("planMap"); if(!el) return; if(!mapKey()){ el.style.display="none"; return; }
   loadMaps().then(()=>{ const pts=stops.filter(s=>s.lat!=null); if(!pts.length){ el.style.display="none"; return; } el.style.display="block";
     const mode=travelMode(tr); const start=dayStart(tr); const info=new google.maps.InfoWindow(); const _dd=(tripDays(tr)[day]||{}).date;
     const map=new google.maps.Map(el,{center:{lat:pts[0].lat,lng:pts[0].lng},zoom:13,mapTypeId:"roadmap",mapTypeControl:true,mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT},streetViewControl:false,fullscreenControl:false});
@@ -3055,7 +3058,7 @@ function renderDayMap(stops,tr,day){ const el=document.getElementById("planMap")
   }).catch(()=>{ el.style.display="none"; }); }
 
 const DAY_COLORS=["#0E2148","#E0A33E","#16A34A","#2F6BE0","#DC2626","#9333EA","#0891B2","#DB2777","#CA8A04","#15803D"];
-function renderTripMap(tr){ const el=document.getElementById("tripMap"); if(!el) return; if(!S.settings.mapKey){ el.style.display="none"; return; }
+function renderTripMap(tr){ const el=document.getElementById("tripMap"); if(!el) return; if(!mapKey()){ el.style.display="none"; return; }
   loadMaps().then(()=>{ const days=tripDays(tr); const byDay=[];
     days.forEach(dd=>{ const stops=(tr.plan||[]).filter(s=>s.day===dd.i && s.lat!=null).sort((a,b)=>String(a.time||"").localeCompare(String(b.time||""))); if(stops.length) byDay.push({i:dd.i,stops}); });
     const allPts=byDay.reduce((a,d)=>a.concat(d.stops),[]); if(!allPts.length){ el.style.display="none"; return; } el.style.display="block";
@@ -3578,7 +3581,7 @@ function renderMemories(){ const body=document.getElementById("memBody"); if(!bo
   else if(f==="days"){ h+= byDayHtml(tr,mems); }
   else { const favs=places.filter(p=>p.fav);
     const located=(tr.plan||[]).some(s=>s.lat!=null);
-    if(located && S.settings.mapKey){ h+=`<div class="mem-sec-head"><h2>${t("mem.tripMap")}</h2></div><div id="tripMap" class="tripmap"></div><div class="map-legend">`+tripDays(tr).filter(dd=>(tr.plan||[]).some(s=>s.day===dd.i&&s.lat!=null)).map(dd=>`<span class="lg"><i style="background:${DAY_COLORS[dd.i%DAY_COLORS.length]}"></i>${t("plan.day")} ${dd.i+1}</span>`).join("")+`</div>`; }
+    if(located && mapKey()){ h+=`<div class="mem-sec-head"><h2>${t("mem.tripMap")}</h2></div><div id="tripMap" class="tripmap"></div><div class="map-legend">`+tripDays(tr).filter(dd=>(tr.plan||[]).some(s=>s.day===dd.i&&s.lat!=null)).map(dd=>`<span class="lg"><i style="background:${DAY_COLORS[dd.i%DAY_COLORS.length]}"></i>${t("plan.day")} ${dd.i+1}</span>`).join("")+`</div>`; }
     if(favs.length){ h+=`<div class="mem-sec-head"><h2>${t("mem.highlights")}</h2></div><div class="mem-places">`+favs.map(p=>memPlaceCard(tr,p)).join("")+`</div>`; }
     if(mems.length){ h+=`<div class="mem-sec-head"><h2>${t("mem.byDay")}</h2><span class="cnt">${t("mem.photoCount",{n:mems.length})}</span></div>`+byDayHtml(tr,mems); }
     h+=`<div class="mem-sec-head"><h2>${t("mem.places")}</h2></div>`;
